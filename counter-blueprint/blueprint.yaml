@@ -1,0 +1,42 @@
+tosca_definitions_version: cloudify_dsl_1_3
+
+imports:
+  - http://www.getcloudify.org/spec/cloudify/4.5/types.yaml
+  - plugin:cloudify-utilities-plugin 
+
+inputs:
+
+  rest_endpoint:
+    description: >
+      REST API endpoint
+    default: "10.239.0.220"
+  
+  rest_endpoint_port:
+    type: integer
+    description: >
+      REST API endpoint port
+      default: "5000"
+
+node_templates:
+
+  counterOne:
+    type: cloudify.rest.Requests
+    properties:
+      hosts: [{ get_input: rest_endpoint }]
+      port: { get_input: rest_endpoint_port }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        start:
+          inputs:
+            template_file: templates/get-counter-template.yaml
+
+  counterTwo:
+    type: cloudify.rest.Requests
+    properties:
+      hosts: [{ get_input: rest_endpoint }]
+      port: { get_input: rest_endpoint_port }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        start:
+          inputs:
+            template_file: templates/get-counter-template.yaml

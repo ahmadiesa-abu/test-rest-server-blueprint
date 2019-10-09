@@ -1,0 +1,10 @@
+rest_calls:
+  - path: /counter
+    method: POST
+    headers:
+      Content-type: application/json
+    payload:
+    response_format: json
+    recoverable_codes: [200]
+    response_translation: [counter]
+    response_expectation:
