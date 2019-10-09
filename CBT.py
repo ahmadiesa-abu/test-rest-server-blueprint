@@ -40,55 +40,59 @@ def increment_executions(lock):
 def decrement_executions(client,deployment_id,lock):
 	global currently_executing
 	while get_workflow_status(client,deployment_id)!='terminated':
-		time.sleep(0.5)
+		time.sleep(0.1)
         lock.acquire()
+        currently_executing = currently_executing - 1
+        lock.release()
+
+def decrement_executions_error(lock):
+	global currently_executing
+	lock.acquire()
         currently_executing = currently_executing - 1
         lock.release()
 
 
 def create_run_deployment(client,endpoint_dict,lock):
 	global currently_executing
-	try:
-		deployment_id = 'Counter-Test-DT'+str(current_milli_time())
-		print ('time start for deployment {0} is {1}'.format(deployment_id,str(time.strftime('%Y/%m/%d %H:%M:%S'))))
-		deployment = client.deployments.create(blueprint_id,deployment_id,endpoint_dict)
-		for attempt in range(50):
-			try:
-				execution = client.executions.start(deployment_id,'install')
-			except DeploymentEnvironmentCreationInProgressError as inprogress:
-				time.sleep(0.2)
-			except DeploymentEnvironmentCreationPendingError as pending:
-				time.sleep(0.2)
-			except Exception as ex:
-				print ("error happned for deployment {0} exception {1}".format(deployment_id,str(ex)))
-				errors_list.append(deployment_id)
-				decrement_executions(client,deployment_id,lock)
-				break
+	global deployments_count
+        global max_threads
+        global currently_executing
+	while deployments_count>0:
+                while currently_executing == max_threads:
+                        time.sleep(0.1)
+		try:
+			increment_executions(lock)
+			deployment_id = 'Counter-Test-DT'+str(current_milli_time())
+			print ('time start for deployment {0} is {1}'.format(deployment_id,str(time.strftime('%Y/%m/%d %H:%M:%S'))))
+			deployment = client.deployments.create(blueprint_id,deployment_id,endpoint_dict)
+			for attempt in range(50):
+				try:
+					execution = client.executions.start(deployment_id,'install')
+				except (DeploymentEnvironmentCreationInProgressError,DeploymentEnvironmentCreationPendingError) as create_deployment_exception:
+					time.sleep(0.1)
+				except Exception as ex:
+                                        decrement_executions_error(lock)
+					print ("error happned for deployment {0} exception {1}".format(deployment_id,str(ex)))
+					errors_list.append(deployment_id)
+					break
+				else:
+					deployments_list.append(deployment_id)
+					decrement_executions(client,deployment_id,lock)
+                                        print ('time finish for successful deployment {0} is {1}'.format(deployment_id,str(time.strftime('%Y/%m/%d %H:%M:%S'))))
+					break
 			else:
-				deployments_list.append(deployment_id)
-				print ('time finish for successful deployment {0} is {1}'.format(deployment_id,str(time.strftime('%Y/%m/%d %H:%M:%S'))))
-				decrement_executions(client,deployment_id,lock)
-				break
-		else:
-			print ("deployment {0} timed-out ".format(deployment_id))
-			decrement_executions(client,deployment_id,lock)
+				decrement_executions_error(lock)
+                                print ("deployment {0} timed-out ".format(deployment_id))
+				errors_list.append(deployment_id)
+		except Exception as ex:
+			decrement_executions_error(lock)
+			print ("error happned for deployment {0} exception {1}".format(deployment_id,str(ex)))
 			errors_list.append(deployment_id)
-	except Exception as ex:
-		decrement_executions(client,deployment_id,lock)
-		print ("error happned for deployment {0} exception {1}".format(deployment_id,str(ex)))
-		errors_list.append(deployment_id)
 
 def create_threads(threads,client,endpoint_dict,lock):
-	global deployments_count
-	global max_threads
-	global currently_executing
-	for i in range(deployments_count):
-		while currently_executing == max_threads:
-			time.sleep(1)
-		increment_executions(lock)
-               	x = threading.Thread(target=create_run_deployment, args=(client,endpoint_dict,lock))
-               	threads.append(x)
-               	x.start()
+	x = threading.Thread(target=create_run_deployment, args=(client,endpoint_dict,lock))
+        threads.append(x)
+        x.start()
 
 def destroy_threads(threads,lock):
 	global deployments_count
@@ -97,7 +101,7 @@ def destroy_threads(threads,lock):
 		lock.acquire()
 		executionDone = (deployments_count == 0)
 		lock.release()
-		time.sleep(1)
+		time.sleep(0.1)
 	threads = [t for t in threads if t.is_alive()]
 	for index, thread in enumerate(threads):
 		thread.join()
