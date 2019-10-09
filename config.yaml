@@ -1,0 +1,6 @@
+manager_ip: 10.239.0.215
+manager_username: admin
+manager_password: admin
+manager_tenant: default_tenant 
+rest_server: 10.239.0.220
+rest_server_port: 5000
