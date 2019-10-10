@@ -7,8 +7,6 @@ import logging
 import yaml
 
 from cloudify_rest_client import CloudifyClient
-from cloudify_rest_client.exceptions import DeploymentEnvironmentCreationInProgressError
-from cloudify_rest_client.exceptions import DeploymentEnvironmentCreationPendingError
 
 endpoint_dict = {}
 blueprint_id = 'Counter-Test-BP'
@@ -69,7 +67,6 @@ def decrement_executions_error(lock):
 
 
 def create_run_deployment(client,endpoint_dict,lock):
-	global currently_executing
 	global deployments_count
         global max_threads
         global currently_executing
